@@ -20,3 +20,6 @@ verify the install
 
 Install  
 `go get -u github.com/X-CASH-official/turbotx-backend`
+
+copy the systemd file  
+`cp -a turbotx-backend.service /lib/systemd/system/ && sudo systemctl daemon-reload`
