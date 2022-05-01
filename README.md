@@ -26,3 +26,5 @@ copy the systemd file
 
 Install redis  
 `sudo add-apt-repository ppa:redislabs/redis -y && sudo apt-get update && sudo apt install redis`
+
+Setup local xcashd and xcash-rpc-wallet
