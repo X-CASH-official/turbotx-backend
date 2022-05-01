@@ -1,7 +1,8 @@
 package main
  
 import (
-"fmt"
+"math/rand"
+"strings"
 "context"
 "strconv"
 "bytes"
@@ -41,9 +42,9 @@ type TurboTxOut struct {
     Amount string `json:"amount"`
 }
  
-type delegatesArray []struct {
+type delegatesArray struct {
     TotalVoteCount string `json:"total_vote_count"`
-    IPAddress string `json:"IP_address"`
+    IPAddress string `json:"ip_address"`
     DelegateName string `json:"delegate_name"`
     SharedDelegateStatus string `json:"shared_delegate_status"`
     DelegateFee string `json:"delegate_fee"`
@@ -71,9 +72,8 @@ const BLOCK_VERIFIER_VALID_AMOUNT = 27
  
  
 // Functions
-func send_http_data(url string,data string) string
-{
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(data))
+func send_http_data(url string,data string) string {
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(data)))
 	req.Header.Set("Content-Type", "application/json")
  
 	client := &http.Client{}
@@ -83,12 +83,12 @@ func send_http_data(url string,data string) string
 		return "error"
 	}
 	defer resp.Body.Close()
-        return string(ioutil.ReadAll(resp.Body))
+        body, _ := ioutil.ReadAll(resp.Body)
+        return string(body)
 }
  
  
-func RandStringBytes(n int) string 
-{
+func RandStringBytes(n int) string {
     b := make([]byte, n)
     for i := range b {
         b[i] = letterBytes[rand.Intn(len(letterBytes))]
@@ -96,8 +96,7 @@ func RandStringBytes(n int) string
     return string(b)
 }
  
-func turbo_tx_verify(class TurboTxSave) int
-{
+func turbo_tx_verify(class TurboTxSave) int {
   // variables
   results := make(chan string)
   delegate_count := 0
@@ -108,24 +107,25 @@ func turbo_tx_verify(class TurboTxSave) int
   string := send_http_data("http://delegates.xcash.foundation/getdelegates","")
  
   // parse the delegates data
-  var delegates []delegatesArray
+  var delegates = []delegatesArray{}
     if err := json.Unmarshal([]byte(string), &delegates); err != nil {
         return 0
     }
  
   // get the tx for each delegate on a separate thread
-  for count, val := range delegates {
-        go func() {
-            results <- send_http_data(val.IP_address + ":18281/get_transaction_pool","")
-        }(count)
+  for count,val := range delegates {
+       count++
+        go func(val delegatesArray) {
+            results <- send_http_data(val.IPAddress + ":18281/get_transaction_pool","")
+        }(val)
     }
  
   // Receive results from the channel and use them.
-    for i := 0; i < rep; i++ {
-        if strings.Contains(<-results, class.tx_hash) {
+    for count,_ := range delegates {
+        if strings.Contains(<-results, class.TX_Hash) {
           delegate_count++
           if delegate_selection_count == 0 {
-            delegate_selection_count = i
+            delegate_selection_count = count
           }
         }
     }
@@ -137,28 +137,28 @@ func turbo_tx_verify(class TurboTxSave) int
  // get the delegate selection
  for count, val := range delegates {
   if count == delegate_selection_count {
-    delegate_selection = val.IP_address
+    delegate_selection = val.IPAddress
    }
  }
  
   // set your wallet to use the delegate selection remote node
-  string = send_http_data("127.0.0.1:18285/json_rpc",[]byte(`{"jsonrpc":"2.0","id":"0","method":"set_daemon","params": {"address":delegate_selection + ":18281,"trusted":true}}`))
+  string = send_http_data("127.0.0.1:18285/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"set_daemon","params": {"address":` + delegate_selection + `":18281,"trusted":true}}`)
  
   if strings.Contains(string, "error") {
    return 0
   }
  
   // the majority of delegates verified the tx, now check if both the sender and receiver are in the tx and the amount is correct
-  string = send_http_data("127.0.0.1:18285/json_rpc",[]byte(`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":class.tx_hash,"tx_key":class.tx_key,"address":class.reciever}}`))
+  string = send_http_data("127.0.0.1:18285/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":class.tx_hash,"tx_key":class.tx_key,"address":class.reciever}}`)
  
   if !strings.Contains(string, "\"received\"") {
    return 0
   }
  
-   tx := delegatesArray{}
+   tx := TXResults{}
    json.Unmarshal([]byte(string), &tx)
  
-  return tx.Result.received
+  return tx.Result.Received
 }
  
 func main() {
@@ -177,14 +177,12 @@ Prefork: true,
 DisableStartupMessage: true,
 })
  
-app.Post("/processturbotx/", func(c *fiber.Ctx) error
-{
+app.Post("/processturbotx/", func(c *fiber.Ctx) error {
     // create a new turbo tx in object
     turbotxin := new(TurboTxIn)
  
     // get the post request data
-    if err := c.BodyParser(turbotxin); err != nil
-    {
+    if err := c.BodyParser(turbotxin); err != nil {
       return c.SendString("error")
       return err
     }
@@ -195,7 +193,7 @@ app.Post("/processturbotx/", func(c *fiber.Ctx) error
     id := RandStringBytes(IDLENGTH);
  
     // check if the id is already in the database
-    val, err := rdb.Get(ctx, id).Result()
+    _,err := rdb.Get(ctx, id).Result()
     if err != nil {
         return c.SendString("error")
         return err
@@ -208,9 +206,9 @@ app.Post("/processturbotx/", func(c *fiber.Ctx) error
     timestamp := strconv.FormatInt(time.Now().UTC().UnixNano(), 10)
  
     // save the data in the database
-    data := string(`{"id": id, "tx_hash": turbotxin.tx_hash, "tx_key": turbotxin.tx_key, "timestamp": timestamp, "sender": turbotxin.sender, "receiver": turbotxin.receiver, "amount": turbotxin.amount}`)
- 
-    err := rdb.Set(ctx, id, data, 15*time.Minute).Err()
+    data := string(`{"id": id, "tx_hash": turbotxin.tx_hash, "tx_key": turbotxin.tx_key, "timestamp": ` + timestamp + `, "sender": turbotxin.sender, "receiver": turbotxin.receiver, "amount": turbotxin.amount}`)
+
+    err = rdb.Set(ctx, id, data, 15*time.Minute).Err()
     if err != nil {
         return c.SendString("error")
         return err
@@ -220,8 +218,7 @@ app.Post("/processturbotx/", func(c *fiber.Ctx) error
     return c.SendString(URL + id)
 })
  
-app.Get("/getturbotx/", func(c *fiber.Ctx) error
-{
+app.Get("/getturbotx/", func(c *fiber.Ctx) error {
   id := c.Query("id")
  
   // get the id from the database
@@ -236,19 +233,18 @@ app.Get("/getturbotx/", func(c *fiber.Ctx) error
    json.Unmarshal([]byte(val), &data)
  
    // check if the amount is correct and the sender and receiver are in the output
+   datamount, err := strconv.Atoi(data.Amount)
    amount := turbo_tx_verify(data)
-   if amount <= data.amount || amount <= 0
-  {
+   if amount <= datamount || amount <= 0 {
       return c.SendString("error")
       return err
   } 
  
-  result := TurboTxOut{data.id, data.tx_hash, data.timestamp, data.sender, data.receiver, strconv.FormatInt(int64(amount), 10)}
+  result := TurboTxOut{data.ID, data.TX_Hash, data.Timestamp, data.Sender, data.Receiver, strconv.FormatInt(int64(amount), 10)}
   return c.JSON(result)
 })
  
-app.Get("/*", func(c *fiber.Ctx) error
-{
+app.Get("/*", func(c *fiber.Ctx) error {
   return c.SendString("Invalid URL")
 })
  
