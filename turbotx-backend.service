@@ -1,0 +1,15 @@
+[Unit]
+Description=turbo tx backend
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+LimitNOFILE=infinity
+User=root
+ExecStart=/root/turbotx-backend/turbotx-backend
+Restart=always
+RestartSec=5
+ 
+[Install]
+WantedBy=multi-user.target
