@@ -272,7 +272,7 @@ fmt.Printf("str1: %s\n", data)
 
     err = rdb.Set(ctx, id, data, 1500*time.Minute).Err()
     if err != nil {
-        return c.SendString("error")
+        return c.JSON({"Error":"error"})
         return err
     }
  
@@ -284,7 +284,7 @@ app.Get("/getturbotx/", func(c *fiber.Ctx) error {
   id := c.Query("id")
 val, _ := rdb.Get(ctx, id).Result()
     if val == "" {
-      return c.SendString("error")
+      return c.JSON({"Error":"error"})
     }
 fmt.Printf("%s\n", val)
    // convert the string to a json object
@@ -297,7 +297,7 @@ fmt.Println("Struct is:", data)
    datamount, _ := strconv.Atoi(data.Amount)
    amount,delegate_count,block_status := turbo_tx_verify(data)
    if amount <= datamount || amount <= 0 {
-      return c.SendString("error")
+      return c.JSON({"Error":"error"})
   } 
  
   result := TurboTxOut{id, data.TX_Hash, data.Timestamp, data.Sender, data.Receiver, strconv.FormatInt(int64(amount), 10),strconv.FormatInt(int64(delegate_count), 10),block_status}
