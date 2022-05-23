@@ -33,6 +33,8 @@ type TurboTxOut struct {
     Sender string `json:"sender"`
     Receiver string `json:"receiver"`
     Amount string `json:"amount"`
+    Delegate_Count string `json:"delegate_count"`
+    Block_Status string `json:"block_status"`
 }
  
 type delegatesArray struct {
@@ -61,14 +63,14 @@ type TXResults struct {
 const URL string = "https://xcash.foundation/"
 const letterBytes = "0123456789"
 const IDLENGTH = 5
-const BLOCK_VERIFIER_VALID_AMOUNT = 27
- 
+const BLOCK_VERIFIER_VALID_AMOUNT = 9
+const GET_DELEGATES_URL = "http://dpops-test-internal-2.xcash.foundation/getdelegates"
  
 // Functions
 func send_http_data(url string,data string) string {
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(data)))
 if err != nil {
-		return "error"
+		return "error1"
 	}
 	req.Header.Set("Content-Type", "application/json")
  
@@ -76,10 +78,12 @@ if err != nil {
 	client.Timeout = time.Second * 2
 	resp, err := client.Do(req)
 	if err != nil {
-		return "error"
+		return "error2"
 	}
 	defer resp.Body.Close()
         body, _ := ioutil.ReadAll(resp.Body)
+fmt.Printf("for %s sending %s received %s\n", url,data,body)
+
         return string(body)
 }
  
@@ -109,21 +113,25 @@ func RandStringBytes(n int) string {
     return string(b)
 }
  
-func turbo_tx_verify(class TurboTxSave) int {
+func turbo_tx_verify(class TurboTxSave) (int,int,string) {
   // variables
   results := make(chan string)
   delegate_count := 0
   delegate_selection_count := 0
-  delegate_selection := ""
+  var network_data_nodes_results [5]string
+  var tx TXResults;
+  block_status := "false"
  
   // get a list of each current delegate
-  string := get_http_data("http://delegates.xcash.foundation/getdelegates")
+  string := get_http_data(GET_DELEGATES_URL)
  fmt.Printf("current delegates: %s\n", string)
   // parse the delegates data
   var delegates = []delegatesArray{}
     if err := json.Unmarshal([]byte(string), &delegates); err != nil {
-        return 0
+        return 0,0,block_status
     }
+
+fmt.Printf("TX HASH: %s\n", class.TX_Hash)
  
   // get the tx for each delegate on a separate thread
   for count,val := range delegates {
@@ -143,36 +151,86 @@ fmt.Printf("IP = %s\n", "http://" + val.IPAddress + ":18281/get_transaction_pool
           }
         }
     }
- fmt.Printf("str1: %s\n", "not enough delegates")
+
   if delegate_count < BLOCK_VERIFIER_VALID_AMOUNT {
-    return 0
+fmt.Printf("str1: %s\n", "TX invalid checking if tx is in a block")
+    // check if this tx is already in a block  
+    network_data_nodes_results[0] = send_http_data("http://127.0.0.1:18285/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
+    network_data_nodes_results[1] = send_http_data("http://127.0.0.1:18286/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
+    network_data_nodes_results[2] = send_http_data("http://127.0.0.1:18287/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
+    network_data_nodes_results[3] = send_http_data("http://127.0.0.1:18288/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
+    network_data_nodes_results[4] = send_http_data("http://127.0.0.1:18289/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
+    if strings.Contains(network_data_nodes_results[0], "\"received\"") {
+      json.Unmarshal([]byte(network_data_nodes_results[0]), &tx)
+      block_status = "true"
+      goto TXVALID
+    } else if strings.Contains(network_data_nodes_results[1], "\"received\"") {
+      json.Unmarshal([]byte(network_data_nodes_results[1]), &tx)
+      block_status = "true"
+      goto TXVALID
+    } else if strings.Contains(network_data_nodes_results[2], "\"received\"") {
+      json.Unmarshal([]byte(network_data_nodes_results[2]), &tx)
+      block_status = "true"
+      goto TXVALID
+    } else if strings.Contains(network_data_nodes_results[3], "\"received\"") {
+      json.Unmarshal([]byte(network_data_nodes_results[3]), &tx)
+      block_status = "true"
+      goto TXVALID
+    } else if strings.Contains(network_data_nodes_results[4], "\"received\"") {
+      json.Unmarshal([]byte(network_data_nodes_results[4]), &tx)
+      block_status = "true"
+      goto TXVALID
+    } else {
+      return 0,delegate_count,block_status
+    }  
   }
- 
- // get the delegate selection
+  
+
+
+
+ /*// get the delegate selection
  for count, val := range delegates {
   if count == delegate_selection_count {
     delegate_selection = val.IPAddress
    }
- }
- 
-  // set your wallet to use the delegate selection remote node
-  string = send_http_data("127.0.0.1:18285/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"set_daemon","params": {"address":` + delegate_selection + `":18281,"trusted":true}}`)
- 
-  if strings.Contains(string, "error") {
-   return 0
-  }
+ }*/
+
+fmt.Printf("str1: %s\n", "TX valid")
  
   // the majority of delegates verified the tx, now check if both the sender and receiver are in the tx and the amount is correct
-  string = send_http_data("127.0.0.1:18285/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":class.tx_hash,"tx_key":class.tx_key,"address":class.reciever}}`)
+  network_data_nodes_results[0] = send_http_data("http://127.0.0.1:18285/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
+    network_data_nodes_results[1] = send_http_data("http://127.0.0.1:18286/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
+    network_data_nodes_results[2] = send_http_data("http://127.0.0.1:18287/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
+    network_data_nodes_results[3] = send_http_data("http://127.0.0.1:18288/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
+    network_data_nodes_results[4] = send_http_data("http://127.0.0.1:18289/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
+    if strings.Contains(network_data_nodes_results[0], "\"received\"") {
+      json.Unmarshal([]byte(network_data_nodes_results[0]), &tx)
+      block_status = "false"
+      goto TXVALID
+    } else if strings.Contains(network_data_nodes_results[1], "\"received\"") {
+      json.Unmarshal([]byte(network_data_nodes_results[1]), &tx)
+      block_status = "false"
+      goto TXVALID
+    } else if strings.Contains(network_data_nodes_results[2], "\"received\"") {
+      json.Unmarshal([]byte(network_data_nodes_results[2]), &tx)
+      block_status = "false"
+      goto TXVALID
+    } else if strings.Contains(network_data_nodes_results[3], "\"received\"") {
+      json.Unmarshal([]byte(network_data_nodes_results[3]), &tx)
+      block_status = "false"
+      goto TXVALID
+    } else if strings.Contains(network_data_nodes_results[4], "\"received\"") {
+      json.Unmarshal([]byte(network_data_nodes_results[4]), &tx)
+      block_status = "false"
+      goto TXVALID
+    } else {
+      return 0,delegate_count,block_status
+    } 
+
+  TXVALID:
  
-  if !strings.Contains(string, "\"received\"") {
-   return 0
-  }
- 
-   tx := TXResults{}
-   json.Unmarshal([]byte(string), &tx)
- 
-  return tx.Result.Received
+fmt.Printf("Amount received from %s and %s %d\n",class.ID,class.TX_Hash,tx.Result.Received) 
+  return tx.Result.Received,delegate_count,block_status
 }
  
 func main() {
@@ -209,35 +267,40 @@ app.Post("/processturbotx/", func(c *fiber.Ctx) error {
     timestamp := strconv.FormatInt(time.Now().UTC().UnixNano(), 10)
  
     // save the data in the database
-    data := string(`{"id": ` + id + `, "tx_hash": ` + c.Query("tx_hash") + `, "tx_key": ` + c.Query("tx_key") + `, "timestamp": ` + timestamp + `, "sender": ` + c.Query("sender") + `, "receiver": ` + c.Query("receiver") + `, "amount": ` + c.Query("amount") + `}`)
+    data := string(`{"id": "` + id + `", "tx_hash": "` + c.Query("tx_hash") + `", "tx_key": "` + c.Query("tx_key") + `", "timestamp": "` + timestamp + `", "sender": "` + c.Query("sender") + `", "receiver": "` + c.Query("receiver") + `", "amount": "` + c.Query("amount") + `"}`)
 fmt.Printf("str1: %s\n", data)
 
-    err = rdb.Set(ctx, id, data, 15*time.Minute).Err()
+    err = rdb.Set(ctx, id, data, 1500*time.Minute).Err()
     if err != nil {
         return c.SendString("error")
         return err
     }
  
     // return the id
-    return c.SendString(URL + id)
+    return c.SendString(URL + id + "}")
 })
  
 app.Get("/getturbotx/", func(c *fiber.Ctx) error {
- // id := c.Query("id")
-val := string(`{"id":"00000", "tx_hash":"00", "tx_key": "0", "timestamp": "0", "sender": "xca", "receiver": "xcb"}`)
+  id := c.Query("id")
+val, _ := rdb.Get(ctx, id).Result()
+    if val == "" {
+      return c.SendString("error")
+    }
+fmt.Printf("%s\n", val)
    // convert the string to a json object
-   data := TurboTxSave{}
+   var data TurboTxSave
    json.Unmarshal([]byte(val), &data)
  fmt.Printf("str1: %s\n", "checking data")
+fmt.Println("Struct is:", data)
+
    // check if the amount is correct and the sender and receiver are in the output
-   datamount, err := strconv.Atoi(data.Amount)
-   amount := turbo_tx_verify(data)
+   datamount, _ := strconv.Atoi(data.Amount)
+   amount,delegate_count,block_status := turbo_tx_verify(data)
    if amount <= datamount || amount <= 0 {
       return c.SendString("error")
-      return err
   } 
  
-  result := TurboTxOut{"00", data.TX_Hash, data.Timestamp, data.Sender, data.Receiver, strconv.FormatInt(int64(amount), 10)}
+  result := TurboTxOut{id, data.TX_Hash, data.Timestamp, data.Sender, data.Receiver, strconv.FormatInt(int64(amount), 10),strconv.FormatInt(int64(delegate_count), 10),block_status}
   return c.JSON(result)
 })
 
