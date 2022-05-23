@@ -251,6 +251,8 @@ app.Get("/getturbotx/", func(c *fiber.Ctx) error {
   result := TurboTxOut{data.ID, data.TX_Hash, data.Timestamp, data.Sender, data.Receiver, strconv.FormatInt(int64(amount), 10)}
   return c.JSON(result)
 })
+	
+app.Static("/", "/var/www/html/")
  
 app.Get("/*", func(c *fiber.Ctx) error {
   return c.SendString("Invalid URL")
