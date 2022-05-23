@@ -27,6 +27,6 @@ copy the systemd file
 Install redis  
 `sudo add-apt-repository ppa:redislabs/redis -y && sudo apt-get update && sudo apt install redis`
 
-Setup local EMPTY xcash-rpc-wallet (you do not need a local xcashd)  
-`/root/xcash-official/xcash-core/build/release/bin/xcash-wallet-rpc --wallet-file wallet1 --password password --rpc-bind-port 18285 --confirm-external-bind --daemon-port 18281 --disable-rpc-login --trusted-daemon`
+Setup local EMPTY xcash-rpc-wallet connected to the 5 seed nodes
+`screen -dmS network_data_node_1 /root/xcash-official/xcash-core/build/release/bin/xcash-wallet-rpc --wallet-file delegate-wallet-1 --password password --rpc-bind-port 18285 --confirm-external-bind --daemon-address dpops-test-internal-1.xcash.foundation:18281 --disable-rpc-login --trusted-daemon`
 
