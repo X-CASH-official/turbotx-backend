@@ -274,7 +274,7 @@ app.Post("/processturbotx/", func(c *fiber.Ctx) error {
     data := string(`{"id": "` + id + `", "tx_hash": "` + c.Query("tx_hash") + `", "tx_key": "` + c.Query("tx_key") + `", "timestamp": "` + timestamp + `", "sender": "` + c.Query("sender") + `", "receiver": "` + c.Query("receiver") + `", "amount": "` + c.Query("amount") + `"}`)
 fmt.Printf("str1: %s\n", data)
 
-    err = rdb.Set(ctx, id, data, 1500*time.Minute).Err()
+    err = rdb.Set(ctx, id, data, 1*time.Hour).Err()
     if err != nil {
         error := ErrorResults{"error"}
         return c.JSON(error)
@@ -301,8 +301,10 @@ fmt.Println("Struct is:", data)
    // check if the amount is correct and the sender and receiver are in the output
    datamount, _ := strconv.Atoi(data.Amount)
    amount,delegate_count,block_status := turbo_tx_verify(data)
-   if amount <= datamount || amount <= 0 {
-      return c.SendString("error")
+
+   if amount < datamount || amount <= 0 {
+      error := ErrorResults{"error"}
+      return c.JSON(error)
   } 
  
   result := TurboTxOut{id, data.TX_Hash, data.Timestamp, data.Sender, data.Receiver, strconv.FormatInt(int64(amount), 10),strconv.FormatInt(int64(delegate_count), 10),block_status}
