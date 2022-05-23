@@ -58,6 +58,10 @@ type TXResults struct {
 		Received      int  `json:"received"`
 	} `json:"result"`
 }
+
+type ErrorResults struct {
+    Error string `json:"Error"`
+}
  
 // global constants
 const URL string = "https://xcash.foundation/"
@@ -272,8 +276,8 @@ fmt.Printf("str1: %s\n", data)
 
     err = rdb.Set(ctx, id, data, 1500*time.Minute).Err()
     if err != nil {
-        return c.JSON({"Error":"error"})
-        return err
+        error := ErrorResults{"error"}
+        return c.JSON(error)
     }
  
     // return the id
@@ -284,7 +288,8 @@ app.Get("/getturbotx/", func(c *fiber.Ctx) error {
   id := c.Query("id")
 val, _ := rdb.Get(ctx, id).Result()
     if val == "" {
-      return c.JSON({"Error":"error"})
+      error := ErrorResults{"error"}
+      return c.JSON(error)
     }
 fmt.Printf("%s\n", val)
    // convert the string to a json object
@@ -297,7 +302,7 @@ fmt.Println("Struct is:", data)
    datamount, _ := strconv.Atoi(data.Amount)
    amount,delegate_count,block_status := turbo_tx_verify(data)
    if amount <= datamount || amount <= 0 {
-      return c.JSON({"Error":"error"})
+      return c.SendString("error")
   } 
  
   result := TurboTxOut{id, data.TX_Hash, data.Timestamp, data.Sender, data.Receiver, strconv.FormatInt(int64(amount), 10),strconv.FormatInt(int64(delegate_count), 10),block_status}
