@@ -7,7 +7,7 @@ StartLimitIntervalSec=0
 Type=simple
 LimitNOFILE=infinity
 User=root
-ExecStart=/root/turbotx-backend/turbotx-backend
+ExecStart=/root/turbotx-backend/turbotxmodule
 Restart=always
 RestartSec=5
  
