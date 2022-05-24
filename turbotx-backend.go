@@ -64,7 +64,7 @@ type ErrorResults struct {
 }
  
 // global constants
-const URL string = "http://162.55.235.87?id="
+const URL = "http://162.55.235.87/?id="
 const letterBytes = "0123456789"
 const IDLENGTH = 5
 const BLOCK_VERIFIER_VALID_AMOUNT = 9
