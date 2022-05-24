@@ -157,30 +157,32 @@ fmt.Printf("IP = %s\n", "http://" + val.IPAddress + ":18281/get_transaction_pool
     }
 
   if delegate_count < BLOCK_VERIFIER_VALID_AMOUNT {
+  // the delegates did not have a majority but it could already be in a block
 fmt.Printf("str1: %s\n", "TX invalid checking if tx is in a block")
+
     // check if this tx is already in a block  
     network_data_nodes_results[0] = send_http_data("http://127.0.0.1:18285/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
     network_data_nodes_results[1] = send_http_data("http://127.0.0.1:18286/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
     network_data_nodes_results[2] = send_http_data("http://127.0.0.1:18287/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
     network_data_nodes_results[3] = send_http_data("http://127.0.0.1:18288/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
     network_data_nodes_results[4] = send_http_data("http://127.0.0.1:18289/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
-    if strings.Contains(network_data_nodes_results[0], "\"received\"") {
+    if strings.Contains(network_data_nodes_results[0], "\"in_pool\": true") {
       json.Unmarshal([]byte(network_data_nodes_results[0]), &tx)
       block_status = "true"
       goto TXVALID
-    } else if strings.Contains(network_data_nodes_results[1], "\"received\"") {
+    } else if strings.Contains(network_data_nodes_results[1], "\"in_pool\": true") {
       json.Unmarshal([]byte(network_data_nodes_results[1]), &tx)
       block_status = "true"
       goto TXVALID
-    } else if strings.Contains(network_data_nodes_results[2], "\"received\"") {
+    } else if strings.Contains(network_data_nodes_results[2], "\"in_pool\": true") {
       json.Unmarshal([]byte(network_data_nodes_results[2]), &tx)
       block_status = "true"
       goto TXVALID
-    } else if strings.Contains(network_data_nodes_results[3], "\"received\"") {
+    } else if strings.Contains(network_data_nodes_results[3], "\"in_pool\": true") {
       json.Unmarshal([]byte(network_data_nodes_results[3]), &tx)
       block_status = "true"
       goto TXVALID
-    } else if strings.Contains(network_data_nodes_results[4], "\"received\"") {
+    } else if strings.Contains(network_data_nodes_results[4], "\"in_pool\": true") {
       json.Unmarshal([]byte(network_data_nodes_results[4]), &tx)
       block_status = "true"
       goto TXVALID
