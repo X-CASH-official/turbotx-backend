@@ -67,6 +67,7 @@ type ErrorResults struct {
 const URL = "http://162.55.235.87/?id="
 const letterBytes = "0123456789"
 const IDLENGTH = 5
+const BLOCK_VERIFIER_TOTAL_AMOUNT = 14
 const BLOCK_VERIFIER_VALID_AMOUNT = 9
 const GET_DELEGATES_URL = "http://dpops-test-internal-2.xcash.foundation/getdelegates"
  
@@ -121,10 +122,10 @@ func turbo_tx_verify(class TurboTxSave) (int,int,string) {
   // variables
   results := make(chan string)
   delegate_count := 0
-  delegate_selection_count := 0
-  var network_data_nodes_results [5]string
   var tx TXResults;
   block_status := "false"
+  delegates_data := ""
+  var delegates_results [BLOCK_VERIFIER_TOTAL_AMOUNT]int
  
   // get a list of each current delegate
   string := get_http_data(GET_DELEGATES_URL)
@@ -135,11 +136,18 @@ func turbo_tx_verify(class TurboTxSave) (int,int,string) {
         return 0,0,block_status
     }
 
+  if (len(delegates) < BLOCK_VERIFIER_TOTAL_AMOUNT) {
+    return 0,0,block_status
+  }
+
 fmt.Printf("TX HASH: %s\n", class.TX_Hash)
  
   // get the tx for each delegate on a separate thread
   for count,val := range delegates {
-       count++
+       //count++
+       if (count == BLOCK_VERIFIER_TOTAL_AMOUNT) {
+        break;
+       }
         go func(val delegatesArray) {
 fmt.Printf("IP = %s\n", "http://" + val.IPAddress + ":18281/get_transaction_pool")
             results <- send_http_data("http://" + val.IPAddress + ":18281/get_transaction_pool","")
@@ -148,90 +156,55 @@ fmt.Printf("IP = %s\n", "http://" + val.IPAddress + ":18281/get_transaction_pool
  
   // Receive results from the channel and use them.
     for count,_ := range delegates {
+        if (count == BLOCK_VERIFIER_TOTAL_AMOUNT) {
+        break;
+       }
         if strings.Contains(<-results, class.TX_Hash) {
           delegate_count++
-          if delegate_selection_count == 0 {
-            delegate_selection_count = count
-          }
-        }
+          delegates_results[count] = 1
+        } else {
+        delegates_results[count] = 0
+       }
     }
 
   if delegate_count < BLOCK_VERIFIER_VALID_AMOUNT {
   // the delegates did not have a majority but it could already be in a block
 fmt.Printf("str1: %s\n", "TX invalid checking if tx is in a block")
 
-    // check if this tx is already in a block  
-    network_data_nodes_results[0] = send_http_data("http://127.0.0.1:18285/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
-    network_data_nodes_results[1] = send_http_data("http://127.0.0.1:18286/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
-    network_data_nodes_results[2] = send_http_data("http://127.0.0.1:18287/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
-    network_data_nodes_results[3] = send_http_data("http://127.0.0.1:18288/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
-    network_data_nodes_results[4] = send_http_data("http://127.0.0.1:18289/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
-    if strings.Contains(network_data_nodes_results[0], "\"in_pool\": true") {
-      json.Unmarshal([]byte(network_data_nodes_results[0]), &tx)
+    // check if this tx is already in a block 
+    for count,val := range delegates {
+      if (count == BLOCK_VERIFIER_TOTAL_AMOUNT) {
+        break;
+       }
+
+      // since this tx could already be in a block, the delegates_results might be 0 on all of them, so just try each one in order since the first 5 are the seed nodes
+       delegates_data = send_http_data("http://" + val.IPAddress + ":18286/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
+       if strings.Contains(delegates_data, "\"in_pool\": false") {
+      json.Unmarshal([]byte(delegates_data), &tx)
       block_status = "true"
       goto TXVALID
-    } else if strings.Contains(network_data_nodes_results[1], "\"in_pool\": true") {
-      json.Unmarshal([]byte(network_data_nodes_results[1]), &tx)
-      block_status = "true"
-      goto TXVALID
-    } else if strings.Contains(network_data_nodes_results[2], "\"in_pool\": true") {
-      json.Unmarshal([]byte(network_data_nodes_results[2]), &tx)
-      block_status = "true"
-      goto TXVALID
-    } else if strings.Contains(network_data_nodes_results[3], "\"in_pool\": true") {
-      json.Unmarshal([]byte(network_data_nodes_results[3]), &tx)
-      block_status = "true"
-      goto TXVALID
-    } else if strings.Contains(network_data_nodes_results[4], "\"in_pool\": true") {
-      json.Unmarshal([]byte(network_data_nodes_results[4]), &tx)
-      block_status = "true"
-      goto TXVALID
-    } else {
-      return 0,delegate_count,block_status
-    }  
+      }
+    } 
+    return 0,delegate_count,block_status 
   }
-  
-
-
-
- /*// get the delegate selection
- for count, val := range delegates {
-  if count == delegate_selection_count {
-    delegate_selection = val.IPAddress
-   }
- }*/
 
 fmt.Printf("str1: %s\n", "TX valid")
  
   // the majority of delegates verified the tx, now check if both the sender and receiver are in the tx and the amount is correct
-  network_data_nodes_results[0] = send_http_data("http://127.0.0.1:18285/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
-    network_data_nodes_results[1] = send_http_data("http://127.0.0.1:18286/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
-    network_data_nodes_results[2] = send_http_data("http://127.0.0.1:18287/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
-    network_data_nodes_results[3] = send_http_data("http://127.0.0.1:18288/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
-    network_data_nodes_results[4] = send_http_data("http://127.0.0.1:18289/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
-    if strings.Contains(network_data_nodes_results[0], "\"received\"") {
-      json.Unmarshal([]byte(network_data_nodes_results[0]), &tx)
+  for count,val := range delegates {
+      if (count == BLOCK_VERIFIER_TOTAL_AMOUNT) {
+        break;
+       }
+      if delegates_results[count] == 1 {
+       delegates_data = send_http_data("http://" + val.IPAddress + ":18286/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
+       if strings.Contains(delegates_data, "\"in_pool\": true") {
+      json.Unmarshal([]byte(delegates_data), &tx)
       block_status = "false"
       goto TXVALID
-    } else if strings.Contains(network_data_nodes_results[1], "\"received\"") {
-      json.Unmarshal([]byte(network_data_nodes_results[1]), &tx)
-      block_status = "false"
-      goto TXVALID
-    } else if strings.Contains(network_data_nodes_results[2], "\"received\"") {
-      json.Unmarshal([]byte(network_data_nodes_results[2]), &tx)
-      block_status = "false"
-      goto TXVALID
-    } else if strings.Contains(network_data_nodes_results[3], "\"received\"") {
-      json.Unmarshal([]byte(network_data_nodes_results[3]), &tx)
-      block_status = "false"
-      goto TXVALID
-    } else if strings.Contains(network_data_nodes_results[4], "\"received\"") {
-      json.Unmarshal([]byte(network_data_nodes_results[4]), &tx)
-      block_status = "false"
-      goto TXVALID
-    } else {
-      return 0,delegate_count,block_status
-    } 
+      }
+      }
+    }
+ return 0,delegate_count,block_status
 
   TXVALID:
  
