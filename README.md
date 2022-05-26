@@ -6,7 +6,7 @@ install go
 download the latest go version from https://go.dev/doc/install
  
 untar it  
-`tar -xf go* && rm go*.tar.gz`
+`tar -xf go* && rm go*.tar.gz && mv go /usr/local/`
  
 edit the path  
 `sudo nano ~/.profile`
