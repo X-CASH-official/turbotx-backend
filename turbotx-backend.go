@@ -120,7 +120,7 @@ func RandStringBytes(n int) string {
     return string(b)
 }
  
-func turbo_tx_verify(class TurboTxSave) (int,int,string) {
+func turbo_tx_verify(class TurboTxSave) (int,int,string,string) {
   // variables
   results := make(chan string)
   delegate_count := 0
@@ -136,11 +136,11 @@ func turbo_tx_verify(class TurboTxSave) (int,int,string) {
   // parse the delegates data
   var delegates = []delegatesArray{}
     if err := json.Unmarshal([]byte(string), &delegates); err != nil {
-        return 0,0,block_status
+        return 0,0,block_status,"0"
     }
 
   if (len(delegates) < BLOCK_VERIFIER_TOTAL_AMOUNT) {
-    return 0,0,block_status
+    return 0,0,block_status,"0"
   }
 
 fmt.Printf("TX HASH: %s\n", class.TX_Hash)
@@ -186,10 +186,15 @@ fmt.Printf("str1: %s\n", "TX invalid checking if tx is in a block")
        if strings.Contains(delegates_data_receiver, "\"in_pool\": false") && strings.Contains(delegates_data_sender, "\"in_pool\": false") {
       json.Unmarshal([]byte(delegates_data_receiver), &tx)
       block_status = "true"
-      goto TXVALID
+
+      // get the timestamp
+      timestamp_data := send_http_data("http://" + val.IPAddress + ":18281/get_transactions",`{"txs_hashes":["` + class.TX_Hash + `"]}`)
+      timestamp_blockchain_data := timestamp_data[strings.Index(timestamp_data, "\"block_timestamp\""):len(timestamp_data)]
+      timestamp := timestamp_blockchain_data[19:strings.Index(timestamp_blockchain_data, ",")]
+      return tx.Result.Received,delegate_count,block_status,timestamp
       }
     } 
-    return 0,delegate_count,block_status 
+    return 0,delegate_count,block_status,"0"
   }
 
 fmt.Printf("str1: %s\n", "TX valid")
@@ -205,16 +210,11 @@ fmt.Printf("str1: %s\n", "TX valid")
        if strings.Contains(delegates_data_receiver, "\"in_pool\": true") && strings.Contains(delegates_data_sender, "\"in_pool\": true") {
       json.Unmarshal([]byte(delegates_data_receiver), &tx)
       block_status = "false"
-      goto TXVALID
+      return tx.Result.Received,delegate_count,block_status,"0"
       }
       }
     }
- return 0,delegate_count,block_status
-
-  TXVALID:
- 
-fmt.Printf("Amount received from %s and %s %d\n",class.ID,class.TX_Hash,tx.Result.Received) 
-  return tx.Result.Received,delegate_count,block_status
+ return 0,delegate_count,block_status,"0"
 }
  
 func main() {
@@ -291,14 +291,18 @@ fmt.Println("Struct is:", data)
 
    // check if the amount is correct and the sender and receiver are in the output
    datamount, _ := strconv.Atoi(data.Amount)
-   amount,delegate_count,block_status := turbo_tx_verify(data)
+   amount,delegate_count,block_status,timestamp := turbo_tx_verify(data)
 
    if amount < datamount || amount <= 0 {
       error := ErrorResults{"error"}
       return c.JSON(error)
   } 
+
+  if timestamp == "0" {
+    timestamp = data.Timestamp
+  }
  
-  result := TurboTxOut{id, data.TX_Hash, data.Timestamp, data.Sender, data.Receiver, strconv.FormatInt(int64(amount), 10),strconv.FormatInt(int64(delegate_count), 10),block_status}
+  result := TurboTxOut{id, data.TX_Hash, timestamp, data.Sender, data.Receiver, strconv.FormatInt(int64(amount), 10),strconv.FormatInt(int64(delegate_count), 10),block_status}
   return c.JSON(result)
 })
 
