@@ -20,6 +20,9 @@ save the file
 verify the install  
 `go version`
 
+Install redis  
+`sudo add-apt-repository ppa:redislabs/redis && sudo apt-get update && sudo apt-get install redis && sudo systemctl enable --now redis-server`
+
 Install  
 `git clone https://github.com/X-CASH-official/turbotx-backend.git && cd turbotx-backend`
 
