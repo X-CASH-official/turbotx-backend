@@ -2,6 +2,10 @@
 
 Note you do not need the blockchain to use this. It uses all delegates commands
 
+You can download the latest release and run it as well as the [frontend](https://github.com/X-CASH-official/turbotx-frontend) locally if you want, or use the [official website](http://162.55.235.87/)
+
+# How to build from source
+
 install go  
 download the latest go version from https://go.dev/doc/install
  
@@ -38,4 +42,4 @@ Build the program
 Run the program  
 `systemctl start turbotx-backend`
 
-Make sure to install the frontend so you can view the turbo tx id https://github.com/X-CASH-official/turbotx-frontend
+Make sure to install the [frontend](https://github.com/X-CASH-official/turbotx-frontend) so you can view the turbo tx id
