@@ -69,6 +69,8 @@ const letterBytes = "0123456789"
 const IDLENGTH = 5
 const BLOCK_VERIFIER_TOTAL_AMOUNT = 14
 const BLOCK_VERIFIER_VALID_AMOUNT = 9
+const TX_HASH_LENGTH = 64
+const PUBLIC_ADDRESS_LENGTH = 98
 const GET_DELEGATES_URL = "http://dpops-test-internal-2.xcash.foundation/getdelegates"
  
 // Functions
@@ -124,7 +126,8 @@ func turbo_tx_verify(class TurboTxSave) (int,int,string) {
   delegate_count := 0
   var tx TXResults;
   block_status := "false"
-  delegates_data := ""
+  delegates_data_sender := ""
+  delegates_data_receiver := ""
   var delegates_results [BLOCK_VERIFIER_TOTAL_AMOUNT]int
  
   // get a list of each current delegate
@@ -178,9 +181,10 @@ fmt.Printf("str1: %s\n", "TX invalid checking if tx is in a block")
        }
 
       // since this tx could already be in a block, the delegates_results might be 0 on all of them, so just try each one in order since the first 5 are the seed nodes
-       delegates_data = send_http_data("http://" + val.IPAddress + ":18286/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
-       if strings.Contains(delegates_data, "\"in_pool\": false") {
-      json.Unmarshal([]byte(delegates_data), &tx)
+       delegates_data_receiver = send_http_data("http://" + val.IPAddress + ":18286/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
+       delegates_data_sender = send_http_data("http://" + val.IPAddress + ":18286/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Sender + `"}}`)
+       if strings.Contains(delegates_data_receiver, "\"in_pool\": false") && strings.Contains(delegates_data_sender, "\"in_pool\": false") {
+      json.Unmarshal([]byte(delegates_data_receiver), &tx)
       block_status = "true"
       goto TXVALID
       }
@@ -196,9 +200,10 @@ fmt.Printf("str1: %s\n", "TX valid")
         break;
        }
       if delegates_results[count] == 1 {
-       delegates_data = send_http_data("http://" + val.IPAddress + ":18286/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
-       if strings.Contains(delegates_data, "\"in_pool\": true") {
-      json.Unmarshal([]byte(delegates_data), &tx)
+       delegates_data_receiver = send_http_data("http://" + val.IPAddress + ":18286/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Receiver + `"}}`)
+      delegates_data_sender = send_http_data("http://" + val.IPAddress + ":18286/json_rpc",`{"jsonrpc":"2.0","id":"0","method":"check_tx_key","params":{"txid":"` + class.TX_Hash + `","tx_key":"` + class.TX_Key + `","address":"` + class.Sender + `"}}`)
+       if strings.Contains(delegates_data_receiver, "\"in_pool\": true") && strings.Contains(delegates_data_sender, "\"in_pool\": true") {
+      json.Unmarshal([]byte(delegates_data_receiver), &tx)
       block_status = "false"
       goto TXVALID
       }
@@ -231,25 +236,36 @@ DisableStartupMessage: true,
 })
  
 app.Post("/processturbotx/", func(c *fiber.Ctx) error {
-    CREATEID:
+    // Variables
+    var id string
+    tx_hash := c.Query("tx_hash")
+    tx_key := c.Query("tx_key")
+    sender := c.Query("sender")
+    receiver := c.Query("receiver")
+    amount := c.Query("amount")
 
-    // create the id
-    id := RandStringBytes(IDLENGTH);
- 
-    // check if the id is already in the database
-    val, err := rdb.Get(ctx, id).Result()
-    if val != "" {
-      goto CREATEID
+    // error check
+    if (len(tx_hash) != TX_HASH_LENGTH || len(tx_key) != TX_HASH_LENGTH || len(sender) != PUBLIC_ADDRESS_LENGTH || len(receiver) != PUBLIC_ADDRESS_LENGTH) {
+      error := ErrorResults{"error"}
+      return c.JSON(error)
     }
+
+    if _, err := strconv.Atoi(amount); err != nil {
+      error := ErrorResults{"error"}
+      return c.JSON(error)
+    }
+
+    // get the id
+    id = tx_hash[:IDLENGTH]
 
     // get the timestamp
     timestamp := strconv.FormatInt(time.Now().UTC().UnixNano(), 10)
  
     // save the data in the database
-    data := string(`{"id": "` + id + `", "tx_hash": "` + c.Query("tx_hash") + `", "tx_key": "` + c.Query("tx_key") + `", "timestamp": "` + timestamp + `", "sender": "` + c.Query("sender") + `", "receiver": "` + c.Query("receiver") + `", "amount": "` + c.Query("amount") + `"}`)
+    data := string(`{"id": "` + id + `", "tx_hash": "` + tx_hash + `", "tx_key": "` + tx_key + `", "timestamp": "` + timestamp + `", "sender": "` + sender + `", "receiver": "` + receiver + `", "amount": "` + c.Query("amount") + `"}`)
 fmt.Printf("str1: %s\n", data)
 
-    err = rdb.Set(ctx, id, data, 1*time.Hour).Err()
+    err := rdb.Set(ctx, id, data, 1*time.Hour).Err()
     if err != nil {
         error := ErrorResults{"error"}
         return c.JSON(error)
