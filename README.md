@@ -37,7 +37,7 @@ Install redis
 `sudo add-apt-repository ppa:redislabs/redis -y && sudo apt-get update && sudo apt install redis`
 
 Build the program  
-`go build .`
+`make clean ; make release`
 
 Run the program  
 `systemctl start turbotx-backend`
