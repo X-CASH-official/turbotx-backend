@@ -33,9 +33,6 @@ Install
 copy the systemd file  
 `cp -a turbotx-backend.service /lib/systemd/system/ && sudo systemctl daemon-reload`
 
-Install redis  
-`sudo add-apt-repository ppa:redislabs/redis -y && sudo apt-get update && sudo apt install redis`
-
 Build the program  
 `make clean ; make release`
 
