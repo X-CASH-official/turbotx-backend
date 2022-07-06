@@ -306,11 +306,11 @@ fmt.Println("Struct is:", data)
   return c.JSON(result)
 })
 
-app.Static("/", "/var/www/html/")
+app.Static("/", "/var/www/html/turbotx/")
  
 app.Get("/*", func(c *fiber.Ctx) error {
   return c.SendString("Invalid URL")
 })
  
-  app.Listen(":8000")
+  app.Listen(":3000")
 }
